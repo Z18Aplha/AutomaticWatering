@@ -10,9 +10,9 @@ int hum = 0;                      //value of humidity
 int hum_old = 0;                  //for comparison
 int count = 0;                    //counts pumping routines in a row
 
-int dry = 480 ;                   //pump is on for hum_sensor >dry
+int dry = 450 ;                   //pump is on for hum_sensor >dry
 int dt = 10;                      //time between two measurements in seconds
-int t_pump = 7;                   //time how long pump is on
+int t_pump = 12;                   //time how long pump is on
 
 boolean sensors_enabled = true;   //enables or disables routine without sensors
 boolean cap_booted = false;
