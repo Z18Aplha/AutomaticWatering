@@ -1,21 +1,30 @@
 #include <Arduino.h>
+#include <RCSwitch.h>
+
+RCSwitch myTransmitter = RCSwitch();
 
 int hum_sensor = 1;               //Pin of humidty sensor
 int led_fail = 4;                 //Pin of LED to show Errorcode
 int pump = 12;                    //Pin of pump
 int ignore_button = 6;            //Pin of button to ignore errorcode
 int pump_button = 2;              //interrupt pin 2 for pumping manually
+int transmitter = 10;             //D10 is transmitter pin
+unsigned long id = 387600000;     //id of this device (for raspi, to know who talks to him)
 
 int hum = 0;                      //value of humidity
 int hum_old = 0;                  //for comparison
 int count = 0;                    //counts pumping routines in a row
+int count2 = 0;                   //counts runs through loops for transmission
 
 int dry = 450 ;                   //pump is on for hum_sensor >dry
 int dt = 10;                      //time between two measurements in seconds
-int t_pump = 12;                   //time how long pump is on
+int t_pump = 12;                  //time how long pump is on
+int transmit_repeat = 5;          //time between transmission of data in minutes
+double transmit_count = round(transmit_repeat*60/dt);   //counter for runs through loops till transmit
+unsigned long transmission = 0;   //code which will be transmitted
 
 boolean sensors_enabled = true;   //enables or disables routine without sensors
-boolean cap_booted = false;
+boolean cap_booted = true;
 
 void show_errorcode(int code);
 void errorcode_string(int errorcode);
@@ -35,6 +44,9 @@ void setup() {
   pinMode(ignore_button, INPUT);
 
   attachInterrupt(digitalPinToInterrupt(2), pump_manually, RISING);
+
+  myTransmitter.enableTransmit(transmitter);
+  myTransmitter.setProtocol(1);    //standard is 1, just a reminder
 
   Serial.begin(9600);
 }
@@ -109,9 +121,26 @@ void loop() {
   {
     count++;
     pumping(t_pump);
+    transmission = id + 80000;    //'8' on position 4 indicates automatic pump
+    myTransmitter.send(transmission, 32);
+    count2 = 0;                   //causes a transmission of hum values
+    delay(1000);
+
   }
   else{
     count=0;
+  }
+
+  if ((count2 == transmit_count+1) || (count2 == 0))  {
+    transmission = id;
+    transmission = transmission + hum;
+    myTransmitter.send(transmission, 32);
+    Serial.print("transmitted: ");
+    Serial.println(transmission);
+    count2 = 1;
+  }
+  else {
+    count2++;
   }
 
   //delay till next measurment.
@@ -129,7 +158,7 @@ void show_errorcode(int code){
     }
 }
 
-void errorcode_string(int errorcode){
+void errorcode_string(int errorcode){       //'string' is now wrong: transmission added, but it's ok
   switch(errorcode){
     case 1: Serial.println("Soil sensor isn't in soil!");
             break;
@@ -140,6 +169,8 @@ void errorcode_string(int errorcode){
     case 4: Serial.println("Unknown reason for high pumping ratio!");
             break;
   }
+  transmission = id + errorcode*10000;
+  myTransmitter.send(transmission,32);
 }
 
 void pump_manually(){
@@ -149,6 +180,8 @@ void pump_manually(){
   }
   digitalWrite(pump, HIGH);
   Serial.println("manual pumping stopped");
+  transmission = id + 90000;       //'9' on position 4 indicates manual pump
+  myTransmitter.send(transmission, 32);
 }
 
 //stops program and waits for user input
