@@ -16,7 +16,7 @@ int hum_old = 0;                  //for comparison
 int count = 0;                    //counts pumping routines in a row
 int count2 = 0;                   //counts runs through loops for transmission
 
-int dry = 450 ;                   //pump is on for hum_sensor >dry
+int dry = 400 ;                   //pump is on for hum_sensor >dry
 int dt = 10;                      //time between two measurements in seconds
 int t_pump = 12;                  //time how long pump is on
 int transmit_repeat = 5;          //time between transmission of data in minutes
@@ -24,7 +24,7 @@ double transmit_count = round(transmit_repeat*60/dt);   //counter for runs throu
 unsigned long transmission = 0;   //code which will be transmitted
 
 boolean sensors_enabled = true;   //enables or disables routine without sensors
-boolean cap_booted = true;
+boolean cap_booted = false;
 
 void show_errorcode(int code);
 void errorcode_string(int errorcode);
@@ -47,8 +47,11 @@ void setup() {
 
   myTransmitter.enableTransmit(transmitter);
   myTransmitter.setProtocol(1);    //standard is 1, just a reminder
+  myTransmitter.send(id+5000, 32);     //login in bridge
 
   Serial.begin(9600);
+
+  delay(1000);
 }
 
 void loop() {
@@ -121,7 +124,8 @@ void loop() {
   {
     count++;
     pumping(t_pump);
-    transmission = id + 80000;    //'8' on position 4 indicates automatic pump
+    delay(1000);
+    transmission = id + 80000 + analogRead(hum_sensor);    //'8' on position 4 indicates automatic pump
     myTransmitter.send(transmission, 32);
     count2 = 0;                   //causes a transmission of hum values
     delay(1000);
@@ -180,7 +184,9 @@ void pump_manually(){
   }
   digitalWrite(pump, HIGH);
   Serial.println("manual pumping stopped");
-  transmission = id + 90000;       //'9' on position 4 indicates manual pump
+  delay(1000);
+  hum = analogRead(hum_sensor);
+  transmission = id + 90000 + hum;       //'9' on position 4 indicates manual pump
   myTransmitter.send(transmission, 32);
 }
 
@@ -198,6 +204,8 @@ void error_routine(int errorcode){
     }
     Serial.println("continueing manually");
     hum = analogRead(hum_sensor);
+    transmission = id + hum;
+    myTransmitter.send(transmission, 32);
  }
 
  //starts pumping and stops after "t" seconds
